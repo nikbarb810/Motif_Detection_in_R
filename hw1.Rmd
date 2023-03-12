@@ -100,8 +100,15 @@ motifLength=8
 glycoly_foreground = processSequences(glycoly_upstream, motifLength)
 glyconeo_foreground = processSequences(glyconeo_upstream, motifLength)
 
+#CCGCCCCT == 6/33
+#TTTGGCGG == 1/2
+
+print(glycoly_foreground["TTTGGCGG"])
+
 #build background
 background = processSequences(sampled_background, motifLength)
+
+print(background["TTTGGCGG"])
 
 
 #save results
@@ -139,6 +146,41 @@ getProb = function(foreground, background){
 #find the p-value for all substrings of both foregrounds
 glycoly_overpr = getProb(glycoly_foreground, background)
 glyconeo_overpr = getProb(glyconeo_foreground, background)
+
+#save datasets
+save(glycoly_overpr, file="output//glycolysis_overpresented.RData")
+save(glyconeo_overpr, file="output//glyconeogenesis_overpresented.RData")
+
+```
+
+We have successfully calculated all the p-values for each of our foreground.
+
+This enables us to see, which sequences are over presented in our foreground data sets compared the the background one.
+
+A very small p-value means that the sequence is more likely to be found in the foreground compared to the background, and since our foreground is a part of the gene's upstream, these sequences are more likely to be responsible for regulating the gene's MRNA production.
+
+We can now check how many of these substrings have a very low p-value, for example p<0.001
+
+```{r}
+
+p_value = 0.001
+
+#gather all substrings with p < p_value
+glycoly_p_smaller = glycoly_overpr[glycoly_overpr < p_value]
+glyconeo_p_smaller = glyconeo_overpr[glyconeo_overpr < p_value]
+
+#save variables
+save(glycoly_p_smaller, file=paste("output//glycoly_p_smaller_",p_value,".RData"))
+save(glyconeo_p_smaller, file=paste("output//glyconeo_p_smaller_",p_value,".RData"))
+
+
+#print count of each list
+sprintf("count of glycolysis seq with p<%f: %0.f",p_value,length(glycoly_p_smaller))
+sprintf("count of glyconeogenesis seq with p<%f: %0.f",p_value,length(glyconeo_p_smaller))
+
+#find common substrings
+common_substrings = intersect(names(glycoly_p_smaller), names(glyconeo_p_smaller))
+print(common_substrings)
 
 ```
 
