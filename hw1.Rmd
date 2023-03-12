@@ -63,9 +63,26 @@ return(data)
 
 
 
-
+#import the foregrounds
 glycoly_foreground = getData("foreground//Glycolysis_foreground.txt")
 glyconeo_foreground = getData("foreground//Glycolysis_foreground.txt")
+
+
+#import the background
+background_ids = read.table("background//background_ids.txt", header=TRUE, sep="\n")
+
+vect_ids = unlist(background_ids)
+
+#sample the vector
+sample_count = 1000
+sampled_ids = sample(vect_ids, sample_count)
+
+#save sampled output
+write(sampled_ids,file="background//sampled_back_ids.txt")
+
+#import sample ids' sequences
+
+
 ```
 
 
