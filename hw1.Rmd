@@ -4,23 +4,11 @@ output: html_document
 date: "2023-03-11"
 ---
 
+We want to We are scanning sequences to distinguish patters(motifs) in a dataset
 
-We want to 
-We are scanning sequences to distinguish patters(motifs) in a dataset
+As our foreground, we will be using a DNA subsequence on which a protein may bind(Transcription Factor Binding Site) We are searching for motifs, in a region of DNA, which is responsible for regulating the (expression level of a gene)
 
-
-As our foreground, we will be using a DNA subsequence on which a protein may bind(Transcription Factor Binding Site)
-We are searching for motifs, in a region of DNA, which is responsible for regulating the (expression level of a gene)
-
-
-
-
-
-
-
-
-We have the gene names of the Glycolosis and Glyconeogenesis pathways.
-We want to investigate if these 2 lists have more common genes than expected by chance.
+We have the gene names of the Glycolosis and Glyconeogenesis pathways. We want to investigate if these 2 lists have more common genes than expected by chance.
 
 ```{r}
 
@@ -36,8 +24,13 @@ print(common_genes)
 
 ```
 
-We now want to import our foreground for each pathway.
+We now want to import our foreground and background for each pathway.
 
+The foreground of the glycolysis will consist of 35 genes' upstream section, while the glyconeogenesis one, will consist of 67 genes' upstream.
+
+For each case, the length of the upstream will be 500 bases.
+
+As for the background, we will sample 1000 random gene ids from the human body, and portion a 500 base sequence for each sample.
 
 ```{r}
 
@@ -63,14 +56,15 @@ return(data)
 
 
 
-#import the foregrounds
-glycoly_foreground = getData("foreground//Glycolysis_foreground.txt")
-glyconeo_foreground = getData("foreground//Glycolysis_foreground.txt")
+#import the upstreams of each pathway
+glycoly_upstream = getData("foreground//Glycolysis_foreground.txt")
+glyconeo_upstream = getData("foreground//Glyconeogenesis_foreground.txt")
 
 
 #import the background
 background_ids = read.table("background//background_ids.txt", header=TRUE, sep="\n")
 
+#convert to vector
 vect_ids = unlist(background_ids)
 
 #sample the vector
@@ -78,10 +72,73 @@ sample_count = 1000
 sampled_ids = sample(vect_ids, sample_count)
 
 #save sampled output
-write(sampled_ids,file="background//sampled_back_ids.txt")
+#the sampled ids that will be used are in the file "sampled_back_ids_final.txt"
+#write(sampled_ids,file="background//sampled_back_ids.txt")
 
 #import sample ids' sequences
+sampled_background = getData("background//sampled_back_seqs.txt")
 
+```
+
+We now want to distinguish all the unique substrings in both of the foreground datasets, as well as the background one.
+
+```{r}
+
+processSequences = function(seqList, len=5){
+  x = sapply(seqList, function(i){
+    v = strsplit(i,"")[[1]]
+    sapply(1:(length(v)-len+1), function(j){paste(v[j:(j+len-1)],
+  collapse="")})
+  })
+  table(x)
+}
+
+#length of motif
+motifLength=8
+
+#build foreground for each pathway
+glycoly_foreground = processSequences(glycoly_upstream, motifLength)
+glyconeo_foreground = processSequences(glyconeo_upstream, motifLength)
+
+#build background
+background = processSequences(sampled_background, motifLength)
+
+
+#save results
+save(glycoly_foreground, file="output//glycoly_substrings.RData")
+save(glyconeo_foreground, file="output//glyconeo_substrings.RData")
+save(background, file="output//background.RData")
+
+```
+
+At this point we have prepared all the data we need. We will now find the motifs that are overpresented in our foregrounds compared to the background.
+
+```{r}
+getProb = function(foreground, background){
+  probs = vector("numeric", length=length(foreground))
+  sumforground = sum(foreground)
+  sumbackground = sum(background)
+  for(i in 1:length(foreground)){
+    bcounts = 0
+    if( names(foreground)[i] %in% names(background)){
+      bcounts = background[[names(foreground)[i]]]
+      prob = phyper(q=foreground[i]-1, m = bcounts, n = sumbackground -
+                  bcounts, k = sumforground, lower.tail = FALSE)
+      probs[i] = prob
+    }else{
+      bcounts = 1
+      prob = phyper(q=foreground[i]-1, m = bcounts, n = sumbackground -
+                  bcounts, k = sumforground, lower.tail = FALSE)
+      probs[i] = prob
+    }
+  }
+  names(probs) = names(foreground)
+  return(sort(probs, decreasing=FALSE))
+}
+
+#find the p-value for all substrings of both foregrounds
+glycoly_overpr = getProb(glycoly_foreground, background)
+glyconeo_overpr = getProb(glyconeo_foreground, background)
 
 ```
 
