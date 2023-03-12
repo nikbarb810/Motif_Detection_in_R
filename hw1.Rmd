@@ -1,0 +1,78 @@
+---
+title: "Report"
+output: html_document
+date: "2023-03-11"
+---
+
+
+We want to 
+We are scanning sequences to distinguish patters(motifs) in a dataset
+
+
+As our foreground, we will be using a DNA subsequence on which a protein may bind(Transcription Factor Binding Site)
+We are searching for motifs, in a region of DNA, which is responsible for regulating the (expression level of a gene)
+
+
+
+
+
+
+
+
+We have the gene names of the Glycolosis and Glyconeogenesis pathways.
+We want to investigate if these 2 lists have more common genes than expected by chance.
+
+```{r}
+
+#Read data 
+glycoly_gene_ids = read.table("gene_id_pathway//Glycolysis_path.txt", header=TRUE, sep ="\n")
+glyconeo_gene_ids = read.table("gene_id_pathway//Gluconeogenesis_path.txt", header=TRUE, sep="\n")
+
+#find intersection of lists
+common_genes = intersect(unlist(glycoly_gene_ids[1]),unlist(glyconeo_gene_ids[1]))
+
+print(common_genes)
+
+
+```
+
+We now want to import our foreground for each pathway.
+
+
+```{r}
+
+getData = function(filepath) {
+  con = file(filepath, "r")
+  data = list()
+  while ( TRUE ) {
+    line = readLines(con, n = 1)
+    if ( length(line) == 0 ) {
+    break
+    }
+    if(length(grep(">", line)) > 0){
+    name = gsub("^>(\\w+)", replacement="\\1", x=line)
+    data[[name]] = ""
+  }
+  else{
+  data[[name]] = paste(data[[name]], line, sep="")
+  }
+}
+close(con)
+return(data)
+}
+
+
+
+
+glycoly_foreground = getData("foreground//Glycolysis_foreground.txt")
+glyconeo_foreground = getData("foreground//Glycolysis_foreground.txt")
+```
+
+
+
+
+
+
+
+
+
