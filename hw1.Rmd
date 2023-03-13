@@ -178,8 +178,8 @@ glycoly_p_smaller = glycoly_overpr[glycoly_overpr < p_value]
 glyconeo_p_smaller = glyconeo_overpr[glyconeo_overpr < p_value]
 
 #save variables
-save(glycoly_p_smaller, file=paste("output//glycoly_p_smaller_",p_value,".RData"))
-save(glyconeo_p_smaller, file=paste("output//glyconeo_p_smaller_",p_value,".RData"))
+save(glycoly_p_smaller, file="output//glycoly_p_smaller_0_001.RData")
+save(glyconeo_p_smaller, file="output//glyconeo_p_smaller_0_001.RData")
 
 
 #print count of each list
