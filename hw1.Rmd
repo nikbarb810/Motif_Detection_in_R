@@ -4,9 +4,11 @@ output: html_document
 date: "2023-03-11"
 ---
 
-We want to We are scanning sequences to distinguish patters(motifs) in a dataset
+We know that, a TF(Transcription Factor) is a protein that binds to DNA and regulates the expression of genes by increasing or decreasing the rate of transcription of the DNA into RNA.
 
-As our foreground, we will be using a DNA subsequence on which a protein may bind(Transcription Factor Binding Site) We are searching for motifs, in a region of DNA, which is responsible for regulating the (expression level of a gene)
+The area on which the transcription factor binds to the DNA, is called the TFBS(Transcription Factor Binding Site).
+
+In this report we will be analyzing the sequence motifs of the TFBS for 2 processes, Glycolysis and Glyconeogenesis and investigating their correlation.
 
 We have the gene names of the Glycolosis and Glyconeogenesis pathways. We want to investigate if these 2 lists have more common genes than expected by chance.
 
@@ -19,10 +21,18 @@ glyconeo_gene_ids = read.table("gene_id_pathway//Gluconeogenesis_path.txt", head
 #find intersection of lists
 common_genes = intersect(unlist(glycoly_gene_ids[1]),unlist(glyconeo_gene_ids[1]))
 
-print(common_genes)
+#prepping data for hypergeometric
+population = 69299
+white_balls = length(unlist(glycoly_gene_ids[1]))
+sample_size = length(unlist(glyconeo_gene_ids[1]))
+successes = length(common_genes)
 
+prob_is_rand = dhyper(successes, white_balls, population - white_balls, sample_size)
+print(prob_is_rand)
 
 ```
+
+As we can clearly observe, the probability that these 2 lists are randomly chosen is very improbable. This suggests that the 2 processes may have some overlap, in the way they operate.
 
 We now want to import our foreground and background for each pathway.
 
@@ -73,7 +83,9 @@ sampled_ids = sample(vect_ids, sample_count)
 
 #save sampled output
 #the sampled ids that will be used are in the file "sampled_back_ids_final.txt"
+
 #write(sampled_ids,file="background//sampled_back_ids.txt")
+
 
 #import sample ids' sequences
 sampled_background = getData("background//sampled_back_seqs.txt")
@@ -100,6 +112,7 @@ motifLength=8
 glycoly_foreground = processSequences(glycoly_upstream, motifLength)
 glyconeo_foreground = processSequences(glyconeo_upstream, motifLength)
 
+
 #build background
 background = processSequences(sampled_background, motifLength)
 
@@ -111,7 +124,9 @@ save(background, file="output//background.RData")
 
 ```
 
-At this point we have prepared all the data we need. We will now find the motifs that are overpresented in our foregrounds compared to the background.
+At this point we have prepared all the data we need. We will now find the motifs that are over presented in our foregrounds compared to the background.
+
+We achieve this by using the hypergeometric distribution which allows us to distinguish, whether a specific sequence is over presented in the foreground, compared to the background.
 
 ```{r}
 getProb = function(foreground, background){
@@ -140,13 +155,179 @@ getProb = function(foreground, background){
 glycoly_overpr = getProb(glycoly_foreground, background)
 glyconeo_overpr = getProb(glyconeo_foreground, background)
 
+#save datasets
+save(glycoly_overpr, file="output//glycolysis_overpresented.RData")
+save(glyconeo_overpr, file="output//glyconeogenesis_overpresented.RData")
+
+```
+
+We have successfully calculated all the p-values for each of our foreground.
+
+This enables us to see, which sequences are over presented in our foreground data sets compared the the background one.
+
+A very small p-value means that the sequence is more likely to be found in the foreground compared to the background, and since our foreground is a part of the gene's upstream, these sequences are more likely to be responsible for regulating the gene's MRNA production.
+
+We can now check how many of these substrings have a very low p-value, for example p\<0.001.
+
+```{r}
+
+p_value = 0.001
+
+#gather all substrings with p < p_value
+glycoly_p_smaller = glycoly_overpr[glycoly_overpr < p_value]
+glyconeo_p_smaller = glyconeo_overpr[glyconeo_overpr < p_value]
+
+#save variables
+save(glycoly_p_smaller, file=paste("output//glycoly_p_smaller_",p_value,".RData"))
+save(glyconeo_p_smaller, file=paste("output//glyconeo_p_smaller_",p_value,".RData"))
+
+
+#print count of each list
+sprintf("count of glycolysis seq with p<%f: %0.f",p_value,length(glycoly_p_smaller))
+sprintf("count of glyconeogenesis seq with p<%f: %0.f",p_value,length(glyconeo_p_smaller))
+
+#find common substrings
+common_substrings = intersect(names(glycoly_p_smaller), names(glyconeo_p_smaller))
+print(common_substrings)
+
+```
+
+We are now ready to implement the PWM(Position Weight Matrix) that will allow us to 'score' each sequence compared to the one with the lowest p_value.
+
+This will, in turn, help us identify new sequences that may be used by a Transcription Factor to bound to DNA and regulate some gene's expression level.
+
+
+We will build the PWM based on the sequence, of each pathway, that has the smallest p_value.
+
+We can certainly use this sequence alone to build it, or we can find all other sequences that very similar to it, in order to have a more complete result, since we know that the Transcription Factors can be slightly tolerant to small differences in the sequences they bind.
+
+As our motif, for each process, we will use all sequences that have a hamming distance of 1.
+
+```{r}
+library(stringdist)
+getAllInstances = function(candidate, foreground, threshold){
+  allnames = names(foreground)
+  motifstrings = c()
+  for(i in 1:length(allnames)){
+    if( stringdist(candidate, allnames[i], method = "hamming") <
+            threshold){
+      motifstrings = c(motifstrings, rep(allnames[i], foreground[i]))
+    }
+  }
+return(motifstrings)
+}
+
+#threshold
+hamming_dist = 2
+
+#find glycolysis motifs
+glycoly_candidate = names(glycoly_p_smaller)[1]
+glycoly_motifs = unique(getAllInstances(glycoly_candidate, glycoly_foreground, hamming_dist))
+
+#find glyconeogenesis motifs
+glyconeo_candidate = names(glyconeo_p_smaller)[1]
+glyconeo_motifs = unique(getAllInstances(glyconeo_candidate, glyconeo_foreground, hamming_dist))
+print(glyconeo_motifs)
+
 ```
 
 
 
+In order to be more accurate with our results, instead of assuming that each base(A,C,G,T) has an equal 1/4 chance of appearing, we will analyze the frequencies of each base in our background set.
+
+
+
+```{r}
+
+
+collapsed_background = paste(sampled_background, collapse = "") # collapse all lists into 1
+tmp_table = table(strsplit(collapsed_background, "")[[1]]) # count each character
+freq_table = tmp_table[-4]  # drop the 'N' index
+prob_table = freq_table / sum(freq_table) # calculate the probability of each character
+
+prob_vec = unlist(prob_table, use.names =FALSE)
+print(prob_vec)
+
+```
+
+
+We are now ready to define the Position Weight Matrix of each pathway.
+
+```{r}
+getPWM = function(stringMotifs, length=6, alphabet =c("A", "C", "G", "T"),
+  freqs = c(0.2621682,0.2423644,0.2413594,0.2541081)){
+  
+  pfm = matrix(0, nrow=4, ncol=length)
+  row.names(pfm) = alphabet
+  for(i in 1:length(stringMotifs)){
+    v = strsplit(stringMotifs[i], "")[[1]]
+    for(j in 1:length(v)){
+      pfm[v[j], j] = pfm[v[j], j] + 1
+    }
+  }
+ppm = pfm/colSums(pfm)
+print(freqs)
+pwm = pwm = log2((ppm+1e-4)/freqs)
+return(list(pwm=pwm, ppm=ppm))
+}
+
+
+glycoly_pwm = getPWM(stringMotifs=glycoly_motifs, length=8)
+
+
+scoreSeqs = function(pwm, vstring) {
+  
+  max_value = sum(apply(pwm, 2, max))
+  min_value = sum(apply(pwm, 2, min))
+  
+  score = 0
+  v = strsplit(vstring, "")[[1]]
+  scores = vector("numeric", length=length(v)-ncol(pwm)+1)
+  for(i in 1:(length(v)-ncol(pwm)+1)){
+    score = 0
+    for(j in 1:ncol(pwm)){
+      letter = v[i+j-1]
+      score = score + pwm[letter, j]
+    }
+    scores[i] = (score - min_value) / (max_value - min_value)
+  }
+  
+  
+  
+return(scores)
+}
+
+sepSequences = function(str, length) {
+  end = length
+  
+  iter = nchar(str) - length + 1
+  str_list <- vector("list", length = iter)
+  
+  for(i in 1:(nchar(str) - length + 1)) {
+    str_list[[i]] = substring(str, i, end)
+    end = end + 1
+  }
+  
+  return(str_list)
+  
+  
+}
+
+prop = sepSequences(glycoly_upstream[1], 8)
+prop
+
+
+inp_pwm = glycoly_pwm$pwm
+print(names(glycoly_foreground[1]))
+
+
+test = lapply(names(glycoly_foreground),scoreSeqs, pwm=inp_pwm)
+
+vec = unlist(test)
+print(sort(vec, decreasing=TRUE))
 
 
 
 
-
+```
 
