@@ -155,6 +155,7 @@ getProb = function(foreground, background){
 glycoly_overpr = getProb(glycoly_foreground, background)
 glyconeo_overpr = getProb(glyconeo_foreground, background)
 
+
 #save datasets
 save(glycoly_overpr, file="output//glycolysis_overpresented.RData")
 save(glyconeo_overpr, file="output//glyconeogenesis_overpresented.RData")
@@ -227,7 +228,7 @@ glycoly_motifs = unique(getAllInstances(glycoly_candidate, glycoly_foreground, h
 #find glyconeogenesis motifs
 glyconeo_candidate = names(glyconeo_p_smaller)[1]
 glyconeo_motifs = unique(getAllInstances(glyconeo_candidate, glyconeo_foreground, hamming_dist))
-print(glyconeo_motifs)
+print(glycoly_motifs)
 
 ```
 
@@ -245,7 +246,7 @@ tmp_table = table(strsplit(collapsed_background, "")[[1]]) # count each characte
 freq_table = tmp_table[-4]  # drop the 'N' index
 prob_table = freq_table / sum(freq_table) # calculate the probability of each character
 
-prob_vec = unlist(prob_table, use.names =FALSE)
+prob_vec = c(prob_table[1], prob_table[2], prob_table[3], prob_table[4])
 print(prob_vec)
 
 ```
@@ -255,7 +256,7 @@ We are now ready to define the Position Weight Matrix of each pathway.
 
 ```{r}
 getPWM = function(stringMotifs, length=6, alphabet =c("A", "C", "G", "T"),
-  freqs = c(0.2621682,0.2423644,0.2413594,0.2541081)){
+  freqs = rep(0.25,4)){
   
   pfm = matrix(0, nrow=4, ncol=length)
   row.names(pfm) = alphabet
@@ -266,13 +267,11 @@ getPWM = function(stringMotifs, length=6, alphabet =c("A", "C", "G", "T"),
     }
   }
 ppm = pfm/colSums(pfm)
-print(freqs)
 pwm = pwm = log2((ppm+1e-4)/freqs)
 return(list(pwm=pwm, ppm=ppm))
 }
 
 
-glycoly_pwm = getPWM(stringMotifs=glycoly_motifs, length=8)
 
 
 scoreSeqs = function(pwm, vstring) {
@@ -292,18 +291,18 @@ scoreSeqs = function(pwm, vstring) {
     scores[i] = (score - min_value) / (max_value - min_value)
   }
   
-  
-  
 return(scores)
 }
 
+#Given an input string, it returns a list containing all the poss. sequences of input length
 sepSequences = function(str, length) {
   end = length
   
-  iter = nchar(str) - length + 1
-  str_list <- vector("list", length = iter)
+  iter = nchar(str) - length + 1 #num of iterations
+  str_list <- vector("list", length = iter) #initialize list
   
-  for(i in 1:(nchar(str) - length + 1)) {
+  #fill list 
+  for(i in 1:(nchar(str) - length + 1)) { 
     str_list[[i]] = substring(str, i, end)
     end = end + 1
   }
@@ -312,16 +311,29 @@ sepSequences = function(str, length) {
   
   
 }
+#build pwm for both pathways
+glycoly_pwm = getPWM(stringMotifs=glycoly_motifs, length=8, freqs=prob_vec)
+glyconeo_pwm = getPWM(stringMotifs =glyconeo_motifs, length=8, freqs=prob_vec)
 
-prop = sepSequences(glycoly_upstream[1], 8)
-prop
+#build seqs of each gene for both pathways
+glycoly_upstream_seqs = lapply(glycoly_upstream, sepSequences, length=8)
+glyconeo_upstream_seqs = lapply(glyconeo_upstream, sepSequences, length=8)
 
 
 inp_pwm = glycoly_pwm$pwm
 print(names(glycoly_foreground[1]))
 
+length(glycoly_upstream_seqs)
 
-test = lapply(names(glycoly_foreground),scoreSeqs, pwm=inp_pwm)
+#for each gene of the list
+
+#find all scores of its seqs
+#keep best core in a list
+
+#repeat for glyconeogenesis
+
+test = lapply(glycoly_upstream_seqs[[1]] ,scoreSeqs, pwm=inp_pwm)
+test
 
 vec = unlist(test)
 print(sort(vec, decreasing=TRUE))
