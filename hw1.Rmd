@@ -219,7 +219,7 @@ return(motifstrings)
 }
 
 #threshold
-hamming_dist = 2
+hamming_dist = 3
 
 #find glycolysis motifs
 glycoly_candidate = names(glycoly_p_smaller)[1]
@@ -228,6 +228,7 @@ glycoly_motifs = unique(getAllInstances(glycoly_candidate, glycoly_foreground, h
 #find glyconeogenesis motifs
 glyconeo_candidate = names(glyconeo_p_smaller)[1]
 glyconeo_motifs = unique(getAllInstances(glyconeo_candidate, glyconeo_foreground, hamming_dist))
+
 print(glycoly_motifs)
 
 ```
@@ -311,6 +312,7 @@ sepSequences = function(str, length) {
   
   
 }
+
 #build pwm for both pathways
 glycoly_pwm = getPWM(stringMotifs=glycoly_motifs, length=8, freqs=prob_vec)
 glyconeo_pwm = getPWM(stringMotifs =glyconeo_motifs, length=8, freqs=prob_vec)
@@ -320,24 +322,25 @@ glycoly_upstream_seqs = lapply(glycoly_upstream, sepSequences, length=8)
 glyconeo_upstream_seqs = lapply(glyconeo_upstream, sepSequences, length=8)
 
 
-inp_pwm = glycoly_pwm$pwm
-print(names(glycoly_foreground[1]))
 
-length(glycoly_upstream_seqs)
+#takes as input a list where each index is another list of strings
+#scores each index list and keeps max score
+scoreGeneSeqs = function(gene_list, pwm){
+  
+  #initialize list to be returned
+  max_list = vector("list", length = length(gene_list))
+  
+  for(i in 1:length(gene_list)){ #for each gene
+    tmp = lapply(gene_list[[i]],scoreSeqs, pwm=pwm) #apply scoreSeqs on each string
+    max_list[[i]] = max(unlist(tmp)) #keep max score
+  }
+  
+  return(max_list)
+  
+}
 
-#for each gene of the list
-
-#find all scores of its seqs
-#keep best core in a list
-
-#repeat for glyconeogenesis
-
-test = lapply(glycoly_upstream_seqs[[1]] ,scoreSeqs, pwm=inp_pwm)
-test
-
-vec = unlist(test)
-print(sort(vec, decreasing=TRUE))
-
+glycoly_scores = scoreGeneSeqs(glycoly_upstream_seqs, pwm=glycoly_pwm$pwm)
+glyconeo_scores = scoreGeneSeqs(glyconeo_upstream_seqs, pwm=glyconeo_pwm$pwm)
 
 
 
