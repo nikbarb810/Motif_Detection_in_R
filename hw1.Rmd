@@ -219,7 +219,7 @@ return(motifstrings)
 }
 
 #threshold
-hamming_dist = 3
+hamming_dist = 2
 
 #find glycolysis motifs
 glycoly_candidate = names(glycoly_p_smaller)[1]
@@ -229,7 +229,7 @@ glycoly_motifs = unique(getAllInstances(glycoly_candidate, glycoly_foreground, h
 glyconeo_candidate = names(glyconeo_p_smaller)[1]
 glyconeo_motifs = unique(getAllInstances(glyconeo_candidate, glyconeo_foreground, hamming_dist))
 
-print(glycoly_motifs)
+print(glyconeo_motifs)
 
 ```
 
@@ -317,6 +317,9 @@ sepSequences = function(str, length) {
 glycoly_pwm = getPWM(stringMotifs=glycoly_motifs, length=8, freqs=prob_vec)
 glyconeo_pwm = getPWM(stringMotifs =glyconeo_motifs, length=8, freqs=prob_vec)
 
+glycoly_pwm
+
+
 #build seqs of each gene for both pathways
 glycoly_upstream_seqs = lapply(glycoly_upstream, sepSequences, length=8)
 glyconeo_upstream_seqs = lapply(glyconeo_upstream, sepSequences, length=8)
@@ -343,6 +346,49 @@ glycoly_scores = scoreGeneSeqs(glycoly_upstream_seqs, pwm=glycoly_pwm$pwm)
 glyconeo_scores = scoreGeneSeqs(glyconeo_upstream_seqs, pwm=glyconeo_pwm$pwm)
 
 
+```
+
+
+We now have the best scoring sequences of each gene for both our processes.
+But in what way do we classify whether a sequence can potentially bind with a Transcription Factor?
+
+We can define a threshold for the score, say 0.9, and classify all sequences that score higher then this number, as potential candidates, but this solution is not the best, since the threshold is an arbitrary number that we chose.
+
+In order to be more accurate, we can score random sequences from the background, which we know are not related to the processes we are studying, and based on their distribution, define our threshold.
+
+```{r}
+background_seqs = sepSequences(collapsed_background, length=8) #seperate background seqs
+
+#we will be scoring a smaller portion of background, the first 100000 sequences
+glycoly_back_scores = lapply(background_seqs[1:100000],scoreSeqs, pwm=glycoly_pwm$pwm)
+glyconeo_back_scores = lapply(background_seqs[1:100000],scoreSeqs, pwm=glyconeo_pwm$pwm)
+
+#convert to vectors
+glycoly_back_sc_vec = unlist(glycoly_back_scores)
+glyconeo_back_sc_vec = unlist(glyconeo_back_scores)
+
+#create a 2 plot layout
+par(mfrow = c(1, 2), main="Background seqs scored using pwms")
+
+hist(glycoly_back_sc_vec, main="Glycolysis back scores")
+hist(glyconeo_back_sc_vec, main="Glyconeogenesis back scores")
 
 ```
+
+Our threshold in both cases, will be the score for which the distributions have a 5% probability of scoring.
+In essence, we only accept scores who are very unlikely(<0.05) to be found in our distributions, which are random sequences scored with both pwms.
+Since they are very unlikely to be found in the distributions, we can reject the null hypothesis, that they are not correlated to sequences that defined our pwms. Thus, we can, with greater certainty, classify all potential new binding sites for our 2 processes.
+
+```{r}
+
+glycoly_thresh = quantile(x=glycoly_back_sc_vec, probs=0.95)
+glyconeo_thresh = quantile(x=glyconeo_back_sc_vec, probs=0.95)
+
+glycoly_thresh
+```
+
+
+
+
+
 
