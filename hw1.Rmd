@@ -1,16 +1,16 @@
 ---
-title: "Report"
+title: "Motif Detection in Glycolysis and Glyconeogenesis"
 output: html_document
-date: "2023-03-11"
+date: "2023-03-22"
 ---
 
 We know that, a TF(Transcription Factor) is a protein that binds to DNA and regulates the expression of genes by increasing or decreasing the rate of transcription of the DNA into RNA.
 
 The area on which the transcription factor binds to the DNA, is called the TFBS(Transcription Factor Binding Site).
 
-In this report we will be analyzing the sequence motifs of the TFBS for 2 processes, Glycolysis and Glyconeogenesis and investigating their correlation.
+In this report, we will be analyzing the sequence motifs of the TFBS for 2 processes, Glycolysis and Glyconeogenesis and investigating their correlation.
 
-We have the gene names of the Glycolosis and Glyconeogenesis pathways. We want to investigate if these 2 lists have more common genes than expected by chance.
+We have the gene names of the Glycolysis and Glyconeogenesis pathways. We want to investigate if these 2 lists have more common genes than expected by chance.
 
 ```{r}
 
@@ -83,7 +83,6 @@ sampled_ids = sample(vect_ids, sample_count)
 
 #save sampled output
 #the sampled ids that will be used are in the file "sampled_back_ids_final.txt"
-
 #write(sampled_ids,file="background//sampled_back_ids.txt")
 
 
@@ -155,6 +154,8 @@ getProb = function(foreground, background){
 glycoly_overpr = getProb(glycoly_foreground, background)
 glyconeo_overpr = getProb(glyconeo_foreground, background)
 
+glycoly_overpr
+
 
 #save datasets
 save(glycoly_overpr, file="output//glycolysis_overpresented.RData")
@@ -168,7 +169,7 @@ This enables us to see, which sequences are over presented in our foreground dat
 
 A very small p-value means that the sequence is more likely to be found in the foreground compared to the background, and since our foreground is a part of the gene's upstream, these sequences are more likely to be responsible for regulating the gene's MRNA production.
 
-We can now check how many of these substrings have a very low p-value, for example p\<0.001.
+We can now check how many of these substrings have a very low p-value, for example p<0.001.
 
 ```{r}
 
@@ -202,7 +203,7 @@ We will build the PWM based on the sequence, of each pathway, that has the small
 
 We can certainly use this sequence alone to build it, or we can find all other sequences that very similar to it, in order to have a more complete result, since we know that the Transcription Factors can be slightly tolerant to small differences in the sequences they bind.
 
-As our motif, for each process, we will use all sequences that have a hamming distance of 1.
+As our motif, for each process, we will use all sequences that have a hamming distance of 2.
 
 ```{r}
 library(stringdist)
@@ -219,11 +220,12 @@ return(motifstrings)
 }
 
 #threshold
-hamming_dist = 2
+hamming_dist = 3
 
 #find glycolysis motifs
 glycoly_candidate = names(glycoly_p_smaller)[1]
 glycoly_motifs = unique(getAllInstances(glycoly_candidate, glycoly_foreground, hamming_dist))
+
 
 #find glyconeogenesis motifs
 glyconeo_candidate = names(glyconeo_p_smaller)[1]
@@ -303,7 +305,7 @@ sepSequences = function(str, length) {
   str_list <- vector("list", length = iter) #initialize list
   
   #fill list 
-  for(i in 1:(nchar(str) - length + 1)) { 
+  for(i in 1:(iter)) { 
     str_list[[i]] = substring(str, i, end)
     end = end + 1
   }
@@ -313,11 +315,12 @@ sepSequences = function(str, length) {
   
 }
 
+glyconeo_pwm
+glyconeo_motifs
+
 #build pwm for both pathways
 glycoly_pwm = getPWM(stringMotifs=glycoly_motifs, length=8, freqs=prob_vec)
 glyconeo_pwm = getPWM(stringMotifs =glyconeo_motifs, length=8, freqs=prob_vec)
-
-glycoly_pwm
 
 
 #build seqs of each gene for both pathways
@@ -345,6 +348,7 @@ scoreGeneSeqs = function(gene_list, pwm){
 glycoly_scores = scoreGeneSeqs(glycoly_upstream_seqs, pwm=glycoly_pwm$pwm)
 glyconeo_scores = scoreGeneSeqs(glyconeo_upstream_seqs, pwm=glyconeo_pwm$pwm)
 
+glycoly_scores
 
 ```
 
@@ -360,15 +364,16 @@ In order to be more accurate, we can score random sequences from the background,
 background_seqs = sepSequences(collapsed_background, length=8) #seperate background seqs
 
 #we will be scoring a smaller portion of background, the first 100000 sequences
-glycoly_back_scores = lapply(background_seqs[1:100000],scoreSeqs, pwm=glycoly_pwm$pwm)
-glyconeo_back_scores = lapply(background_seqs[1:100000],scoreSeqs, pwm=glyconeo_pwm$pwm)
+glycoly_back_scores = lapply(background_seqs[300000:310000],scoreSeqs, pwm=glycoly_pwm$pwm)
+glyconeo_back_scores = lapply(background_seqs[300000:310000],scoreSeqs, pwm=glyconeo_pwm$pwm)
 
 #convert to vectors
 glycoly_back_sc_vec = unlist(glycoly_back_scores)
 glyconeo_back_sc_vec = unlist(glyconeo_back_scores)
 
+
 #create a 2 plot layout
-par(mfrow = c(1, 2), main="Background seqs scored using pwms")
+par(mfrow = c(1, 2))
 
 hist(glycoly_back_sc_vec, main="Glycolysis back scores")
 hist(glyconeo_back_sc_vec, main="Glyconeogenesis back scores")
@@ -376,19 +381,68 @@ hist(glyconeo_back_sc_vec, main="Glyconeogenesis back scores")
 ```
 
 Our threshold in both cases, will be the score for which the distributions have a 5% probability of scoring.
+
 In essence, we only accept scores who are very unlikely(<0.05) to be found in our distributions, which are random sequences scored with both pwms.
+
 Since they are very unlikely to be found in the distributions, we can reject the null hypothesis, that they are not correlated to sequences that defined our pwms. Thus, we can, with greater certainty, classify all potential new binding sites for our 2 processes.
 
 ```{r}
 
-glycoly_thresh = quantile(x=glycoly_back_sc_vec, probs=0.95)
-glyconeo_thresh = quantile(x=glyconeo_back_sc_vec, probs=0.95)
+prob_perc = 0.95
 
-glycoly_thresh
+#calculate the thresholds
+glycoly_thresh = quantile(x=glycoly_back_sc_vec, probs=prob_perc)
+glyconeo_thresh = quantile(x=glyconeo_back_sc_vec, probs=prob_perc)
+
+#only keep scores that are higher than the threshold
+glycoly_accepted_seqs = glycoly_scores[glycoly_scores > glycoly_thresh]
+glyconeo_accepted_seqs = glyconeo_scores[glyconeo_scores > glyconeo_thresh]
+
+
 ```
 
+What will happen if we score the glyconeogenesis sequences with the glycolysis pwm, and vice versa?
+
+Should we expect the 2 distributions to be similar to the random sequences we scored from the background above or, is there a correlation between the 2 procesess' motifs?
+
+```{r}
 
 
+#score glyconeo based on glycolysis pwm
+glyconeo_scores_glycoly = scoreGeneSeqs(glyconeo_upstream_seqs, pwm=glycoly_pwm$pwm)
+#score glycoly based on glyconeogenesis pwm
+glycoly_scores_glyconeo = scoreGeneSeqs(glycoly_upstream_seqs, pwm=glyconeo_pwm$pwm)
+
+#calculate the differences between the original scores and the above
+glycoly_diff = mapply(FUN = "-", glycoly_scores, glycoly_scores_glyconeo)
+glyconeo_diff = mapply(FUN = "-", glyconeo_scores, glyconeo_scores_glycoly)
+
+#vectorize differences
+glycoly_diff_vec = unlist(glycoly_diff)
+glyconeo_diff_vec = unlist(glyconeo_diff)
+
+#computing the mean of the distributions
+mean(glycoly_diff_vec)
+mean(glyconeo_diff_vec)
+
+
+#create a 2 plot layout
+par(mfrow = c(1, 2))
+
+#plot differences
+hist(glycoly_diff_vec, main="Glycolysis original - mixed scores")
+hist(glyconeo_diff_vec, main="Glyconeogenesis original - mixed scores")
+
+
+```
+
+What we observe is quite surprising. We have selected the max score of each gene in both cases, and we can clearly see that there is significant overlap in the two.
+
+They are so similar in fact, that in the case of glycolysis sequences scored by the glyconeogenesis pwm, it seems that this pwm is actually a better fitting model than the glycolysis pwm, with their mean difference being -0.081.
+
+This is also the case for the glyconeogenesis sequences, as one might observe, since their mean difference with the scores of the glyconeogenesis pwm, being 0.088.
+
+This is a clear indicator that, the 2 processes use very similar sequences to bind with Transcription Factors, in order to regulate the gene's expression level.  
 
 
 
