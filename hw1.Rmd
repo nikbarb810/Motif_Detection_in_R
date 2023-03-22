@@ -1,6 +1,13 @@
 ---
 title: "Motif Detection in Glycolysis and Glyconeogenesis"
 output: html_document
+author:
+- name: Νικολας Μπαρμπαρουσης
+  AM: csd4690
+  
+- name: Μιχαλης Αυγενικος
+  AM: csd4846
+
 date: "2023-03-22"
 ---
 
@@ -408,10 +415,16 @@ Should we expect the 2 distributions to be similar to the random sequences we sc
 ```{r}
 
 
+
+
 #score glyconeo based on glycolysis pwm
 glyconeo_scores_glycoly = scoreGeneSeqs(glyconeo_upstream_seqs, pwm=glycoly_pwm$pwm)
 #score glycoly based on glyconeogenesis pwm
 glycoly_scores_glyconeo = scoreGeneSeqs(glycoly_upstream_seqs, pwm=glyconeo_pwm$pwm)
+
+unlist(glycoly_scores)
+unlist(glycoly_scores_glyconeo)
+
 
 #calculate the differences between the original scores and the above
 glycoly_diff = mapply(FUN = "-", glycoly_scores, glycoly_scores_glyconeo)
@@ -426,7 +439,7 @@ mean(glycoly_diff_vec)
 mean(glyconeo_diff_vec)
 
 
-#create a 2 plot layout
+  #create a 2 plot layout
 par(mfrow = c(1, 2))
 
 #plot differences
@@ -443,6 +456,12 @@ They are so similar in fact, that in the case of glycolysis sequences scored by 
 This is also the case for the glyconeogenesis sequences, as one might observe, since their mean difference with the scores of the glyconeogenesis pwm, being 0.088.
 
 This is a clear indicator that, the 2 processes use very similar sequences to bind with Transcription Factors, in order to regulate the gene's expression level.  
+
+Even if we set the hamming distance to 1, the results we get for the means is 0.041 and -0.04 respectively.
+
+Now while the negative mean, may ring some alarms that there is an error in the calculations, this is probably not the case.
+
+The difference in both cases, is not between the same sequences but rather, between the best scoring sequences for each gene. So finding a negative mean value in the distribution so close to 0, just reassures us, that the 2 processes are closely related.
 
 
 
